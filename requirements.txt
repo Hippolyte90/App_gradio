@@ -1,5 +1,5 @@
 # --- Framework principal ---
-streamlit==1.38.0
+streamlit
 
 # --- Gestion serveur (optionnel si déploiement web) ---
 Flask==3.0.3
@@ -10,25 +10,25 @@ Werkzeug==3.0.3
 python-dotenv==1.0.1
 
 # --- Librairies IA et NLP ---
-openai==1.45.0
+openai-2.3.0
 google-generativeai==0.8.3
 tiktoken==0.7.0
-faiss-cpu==1.8.0
+faiss-cpu==1.12.0
 datasets==3.0.1
-sentencepiece==0.2.0
+sentencepiece
 accelerate==1.0.1
 sentence-transformers==3.1.1
 gensim==4.3.3
 
 # --- Traitement de données et mathématiques ---
-numpy==1.26.4
-pandas==2.2.3
-scikit-learn==1.5.2
-matplotlib==3.9.2
-plotly==5.24.1
+numpy
+pandas
+scikit-learn
+matplotlib
+plotly
 
 # --- Autres outils utiles ---
-unstructured==0.16.6
+unstructured>=0.18.11
 jupyter-dash==0.4.2
 pydub==0.25.1
 feedparser==6.0.11
