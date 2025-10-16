@@ -12,7 +12,7 @@ python-dotenv==1.0.1
 # --- Librairies IA et NLP ---
 openai  #-2.3.0
 google-generativeai==0.8.3
-tiktoken==0.7.0
+tiktoken  #==0.7.0
 faiss-cpu==1.12.0
 datasets==3.0.1
 sentencepiece
