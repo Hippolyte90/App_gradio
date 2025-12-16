@@ -1,13 +1,15 @@
-# pip install streamlit Flask==3.0.3 gunicorn==23.0.0 Werkzeug==3.0.3 python-dotenv numpy pandas scikit-learn matplotlib gensim openai requests
-# pip install tiktoken faiss-cpu datasets sentencepiece google-generativeai unstructured plotly jupyter-dash pydub
+# pip install streamlit Flask==3.0.3 gunicorn==23.0.0 Werkzeug==3.0.3 python-dotenv numpy pandas scikit-learn matplotlib gensim openai requests Pillow
+# pip install tiktoken faiss-cpu datasets sentencepiece google-generativeai unstructured plotly jupyter-dash pydub google-cloud-aiplatform
 # pip install accelerate sentence_transformers feedparser speedtest-cli
 
 import os
 import streamlit as st
 import requests
+import io
 from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
+from PIL import Image, ImageDraw, ImageFont
 
 # -------------------------------
 # 🔧 Configuration de l'application
@@ -160,27 +162,52 @@ if task_choice == "💬 Chat":
 
 elif task_choice == "🎨 Génération d'images":
     st.header("🎨 Génération d'images avec DALL-E 3")
-    image_prompt = st.text_area("🖼️ Décrivez l'image à générer :", height=100)
+    image_prompt = st.text_area("🖼️ 1. Décrivez l'image à générer :", height=100)
+    overlay_text = st.text_input("✍️ 2. (Optionnel) Texte à ajouter sur l'image :")
     generate_button = st.button("Générer l'image")
 
     if generate_button and image_prompt.strip():
         with st.spinner("Génération de l'image en cours..."):
             image_url = generate_image_dalle(image_prompt)
             if image_url and "Erreur" not in image_url:
+                display_image_data = None
                 try:
                     # Récupérer le contenu de l'image depuis l'URL
                     image_data = requests.get(image_url).content
-                    st.image(image_data, caption=f"Image générée pour : '{image_prompt}'")
-                    
-                    # Ajouter un bouton de téléchargement
-                    st.download_button(
-                        label="📥 Télécharger l'image",
-                        data=image_data,
-                        file_name="generated_image.png",
-                        mime="image/png"
-                    )
+                    display_image_data = image_data # Par défaut, on utilise l'image originale
+
+                    # Si l'utilisateur a fourni du texte à ajouter
+                    if overlay_text:
+                        # Ouvre l'image avec Pillow
+                        img = Image.open(io.BytesIO(image_data))
+                        draw = ImageDraw.Draw(img)
+                        
+                        # Essaye de charger une police (sinon utilise la police par défaut)
+                        try:
+                            # Pour un meilleur rendu, vous pouvez placer un fichier .ttf (ex: Arial.ttf) et utiliser :
+                            # font = ImageFont.truetype("Arial.ttf", 40)
+                            font = ImageFont.load_default(size=40)
+                        except IOError:
+                            font = ImageFont.load_default()
+
+                        # Position du texte (en bas à gauche avec une marge)
+                        position = (30, img.height - 60)
+                        # Dessine le texte avec une ombre simple pour la lisibilité
+                        draw.text((position[0]+2, position[1]+2), overlay_text, font=font, fill="black")
+                        draw.text(position, overlay_text, font=font, fill="white")
+
+                        # Sauvegarde l'image modifiée dans un buffer mémoire
+                        buf = io.BytesIO()
+                        img.save(buf, format="PNG")
+                        display_image_data = buf.getvalue()
+
+                    st.image(display_image_data, caption=f"Image générée pour : '{image_prompt}'")
+                    st.download_button(label="📥 Télécharger l'image", data=display_image_data, file_name="generated_image_with_text.png", mime="image/png")
+
                 except requests.exceptions.RequestException as e:
                     st.error(f"Erreur lors de la récupération de l'image : {e}")
+                except Exception as e:
+                    st.error(f"Une erreur est survenue lors du traitement de l'image : {e}")
             else:
                 st.error(image_url)
 

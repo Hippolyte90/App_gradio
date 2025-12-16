@@ -10,3 +10,4 @@ matplotlib
 plotly
 google-generativeai
 requests
+Pillow
