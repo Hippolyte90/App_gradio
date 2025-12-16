@@ -64,7 +64,7 @@ def stream_gpt(prompt):
     messages.append({"role": "user", "content": prompt})
 
     stream = openai.chat.completions.create(
-        model="gpt-4o-mini", messages=messages, stream=True
+        model="gpt-5-mini", messages=messages, stream=True
     )
 
     response = ""
@@ -76,7 +76,7 @@ def stream_gpt(prompt):
 
 def stream_gemini(prompt):
     gemini = google.generativeai.GenerativeModel(
-        model_name="gemini-2.0-flash", system_instruction=system_message
+        model_name="gemini-2.5-flash", system_instruction=system_message
     )
     response = gemini.generate_content(
         [m[1] for m in st.session_state.chat_history] + [prompt],
