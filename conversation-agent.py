@@ -1,9 +1,10 @@
-# pip install streamlit Flask==3.0.3 gunicorn==23.0.0 Werkzeug==3.0.3 python-dotenv numpy pandas scikit-learn matplotlib gensim openai
+# pip install streamlit Flask==3.0.3 gunicorn==23.0.0 Werkzeug==3.0.3 python-dotenv numpy pandas scikit-learn matplotlib gensim openai requests
 # pip install tiktoken faiss-cpu datasets sentencepiece google-generativeai unstructured plotly jupyter-dash pydub
 # pip install accelerate sentence_transformers feedparser speedtest-cli
 
 import os
 import streamlit as st
+import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
@@ -166,7 +167,20 @@ elif task_choice == "🎨 Génération d'images":
         with st.spinner("Génération de l'image en cours..."):
             image_url = generate_image_dalle(image_prompt)
             if image_url and "Erreur" not in image_url:
-                st.image(image_url, caption=f"Image générée pour : '{image_prompt}'")
+                try:
+                    # Récupérer le contenu de l'image depuis l'URL
+                    image_data = requests.get(image_url).content
+                    st.image(image_data, caption=f"Image générée pour : '{image_prompt}'")
+                    
+                    # Ajouter un bouton de téléchargement
+                    st.download_button(
+                        label="📥 Télécharger l'image",
+                        data=image_data,
+                        file_name="generated_image.png",
+                        mime="image/png"
+                    )
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Erreur lors de la récupération de l'image : {e}")
             else:
                 st.error(image_url)
 
