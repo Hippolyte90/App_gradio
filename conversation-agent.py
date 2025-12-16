@@ -99,45 +99,76 @@ def stream_groq(prompt):
     for chunk in stream:
         yield chunk.choices[0].delta.content or ""
 
+def generate_image_dalle(prompt):
+    try:
+        response = openai.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        image_url = response.data[0].url
+        return image_url
+    except Exception as e:
+        return f"Erreur lors de la génération de l'image : {e}"
+
 # -------------------------------
 # 💬 Interface principale
 # -------------------------------
-st.title("🤖 Chat Multi-Modèles (GPT | Gemini | Groq)")
-st.markdown("Discutez en temps réel avec plusieurs modèles d’IA.")
+st.title("🤖 Agent IA Multi-Tâches")
+st.markdown("Discutez avec des modèles de langage ou générez des images.")
 
-model_choice = st.selectbox("🧩 Choisissez un modèle :", ["GPT", "Gemini", "Groq"])
-prompt = st.text_area("🧠 Votre message :", height=130)
-send = st.button("Envoyer")
+task_choice = st.selectbox("Quelle tâche souhaitez-vous effectuer ?", ["💬 Chat", "🎨 Génération d'images"])
 
-# Affichage de l'historique
-if st.session_state.chat_history:
-    for role, content in st.session_state.chat_history:
-        if role == "user":
-            st.chat_message("user").markdown(content)
+if task_choice == "💬 Chat":
+    st.header("💬 Chat Multi-Modèles (GPT | Gemini | Groq)")
+    model_choice = st.selectbox("🧩 Choisissez un modèle :", ["GPT", "Gemini", "Groq"])
+    prompt = st.text_area("🧠 Votre message :", height=130)
+    send = st.button("Envoyer")
+
+    # Affichage de l'historique
+    if st.session_state.chat_history:
+        for role, content in st.session_state.chat_history:
+            if role == "user":
+                st.chat_message("user").markdown(content)
+            else:
+                st.chat_message("assistant").markdown(content)
+
+    # Si l'utilisateur envoie un message
+    if send and prompt.strip():
+        st.session_state.chat_history.append(("user", prompt))
+        st.chat_message("user").markdown(prompt)
+
+        st.chat_message("assistant")
+        response_placeholder = st.empty()
+        full_response = ""
+
+        if model_choice == "GPT":
+            stream = stream_gpt(prompt)
+        elif model_choice == "Gemini":
+            stream = stream_gemini(prompt)
         else:
-            st.chat_message("assistant").markdown(content)
+            stream = stream_groq(prompt)
 
-# Si l'utilisateur envoie un message
-if send and prompt.strip():
-    st.session_state.chat_history.append(("user", prompt))
-    st.chat_message("user").markdown(prompt)
+        for chunk in stream:
+            full_response += chunk
+            response_placeholder.markdown(full_response)
 
-    st.chat_message("assistant")
-    response_placeholder = st.empty()
-    full_response = ""
+        st.session_state.chat_history.append(("assistant", full_response))
 
-    if model_choice == "GPT":
-        stream = stream_gpt(prompt)
-    elif model_choice == "Gemini":
-        stream = stream_gemini(prompt)
-    else:
-        stream = stream_groq(prompt)
+elif task_choice == "🎨 Génération d'images":
+    st.header("🎨 Génération d'images avec DALL-E 3")
+    image_prompt = st.text_area("🖼️ Décrivez l'image à générer :", height=100)
+    generate_button = st.button("Générer l'image")
 
-    for chunk in stream:
-        full_response += chunk
-        response_placeholder.markdown(full_response)
-
-    st.session_state.chat_history.append(("assistant", full_response))
+    if generate_button and image_prompt.strip():
+        with st.spinner("Génération de l'image en cours..."):
+            image_url = generate_image_dalle(image_prompt)
+            if image_url and "Erreur" not in image_url:
+                st.image(image_url, caption=f"Image générée pour : '{image_prompt}'")
+            else:
+                st.error(image_url)
 
 # Bouton pour effacer la conversation
 if st.sidebar.button("🧹 Effacer la conversation"):
@@ -147,7 +178,7 @@ if st.sidebar.button("🧹 Effacer la conversation"):
 # Pied de page
 st.markdown("---")
 st.markdown(
-    "<div style='text-align:center; color:gray;'>✨ Propulsé par GPT, Groq et Gemini — "
-    "Application Streamlit avec mémoire de chat.</div>",
+    "<div style='text-align:center; color:gray;'>✨ Propulsé par OpenAI, Groq et Gemini — "
+    "Application Streamlit.</div>",
     unsafe_allow_html=True,
 )
