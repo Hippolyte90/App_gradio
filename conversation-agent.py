@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
 from PIL import Image, ImageDraw, ImageFont
-from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images
+from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images, animate_uploaded_images
 
 # -------------------------------
 # 🔧 Configuration de l'application
@@ -306,13 +306,8 @@ elif task_choice == "🎬 Génération de vidéos":
 
                 # Si on a des images uploadées, on doit distribuer les frames selon la durée
                 if uploaded_images and pil_images:
-                    n_imgs = len(pil_images)
-                    repeats = -(-total_frames // n_imgs)  # ceil
-                    frames_list = []
-                    for img in pil_images:
-                        for _ in range(repeats):
-                            frames_list.append(img)
-                    frames_list = frames_list[:total_frames]
+                    # Créer des frames animées à partir des images uploadées
+                    frames_list = animate_uploaded_images(pil_images, total_frames)
                 else:
                     frames_list = pil_images
 
