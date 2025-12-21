@@ -13,12 +13,34 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
 from PIL import Image, ImageDraw, ImageFont
+import importlib
+video_utils = None
+pil_images_from_uploaded_files = None
+make_mp4_from_pil_images = None
+animate_uploaded_images = None
 try:
-    from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images, animate_uploaded_images
+    video_utils = importlib.import_module("video_utils")
 except Exception:
+    # attempt to add module dir and reimport
     import sys
     sys.path.append(os.path.dirname(__file__))
-    from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images, animate_uploaded_images
+    video_utils = importlib.import_module("video_utils")
+
+if video_utils:
+    pil_images_from_uploaded_files = getattr(video_utils, "pil_images_from_uploaded_files", None)
+    make_mp4_from_pil_images = getattr(video_utils, "make_mp4_from_pil_images", None)
+    animate_uploaded_images = getattr(video_utils, "animate_uploaded_images", None)
+
+    # Provide clear errors if functions are missing (deployed file older/missing)
+    if pil_images_from_uploaded_files is None:
+        def pil_images_from_uploaded_files(*args, **kwargs):
+            raise RuntimeError("video_utils.pil_images_from_uploaded_files introuvable. Assurez-vous que video_utils.py est à jour.")
+    if make_mp4_from_pil_images is None:
+        def make_mp4_from_pil_images(*args, **kwargs):
+            raise RuntimeError("video_utils.make_mp4_from_pil_images introuvable. Assurez-vous que video_utils.py est à jour.")
+    if animate_uploaded_images is None:
+        def animate_uploaded_images(*args, **kwargs):
+            raise RuntimeError("video_utils.animate_uploaded_images introuvable. Assurez-vous que video_utils.py est à jour.")
 
 # -------------------------------
 # 🔧 Configuration de l'application
