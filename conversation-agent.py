@@ -181,7 +181,7 @@ if task_choice == "💬 Chat":
             full_response += chunk
             response_placeholder.markdown(full_response)
 
-        elif task_choice == "🎨 Génération d'images":
+        st.session_state.chat_history.append(("assistant", full_response))
 
 elif task_choice == "🎨 Génération d'images":
     st.header("🎨 Génération d'images avec DALL-E 3")
@@ -194,62 +194,61 @@ elif task_choice == "🎨 Génération d'images":
         with st.spinner("Génération de l'image en cours..."):
             image_url = generate_image_dalle(image_prompt)
             if image_url and "Erreur" not in image_url:
-                            # Récupérer le contenu de l'image depuis l'URL
-                            image_data = requests.get(image_url).content
+                display_image_data = None
+                try:
+                    # Récupérer le contenu de l'image depuis l'URL
+                    image_data = requests.get(image_url).content
 
-                            # Ouvre l'image avec Pillow et force RGBA pour conserver canaux
-                            img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+                    # Ouvre l'image avec Pillow et force RGBA pour conserver canaux
+                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
 
-                            # Déterminer le ratio cible
-                            if ratio_choice == "1:1":
-                                target_ratio = 1.0
-                            elif ratio_choice == "16:9":
-                                target_ratio = 16.0 / 9.0
-                            else:
-                                target_ratio = 9.0 / 16.0
+                    # Déterminer le ratio cible
+                    if ratio_choice == "1:1":
+                        target_ratio = 1.0
+                    elif ratio_choice == "16:9":
+                        target_ratio = 16.0 / 9.0
+                    else:
+                        target_ratio = 9.0 / 16.0
 
-                            # Recadrer au ratio choisi (centré)
-                            cropped = crop_to_aspect(img, target_ratio)
+                    # Recadrer au ratio choisi (centré)
+                    cropped = crop_to_aspect(img, target_ratio)
 
-                            # Redimensionner si nécessaire pour garder une taille raisonnable (max 1024)
-                            max_dim = 1024
-                            w, h = cropped.size
-                            scale = min(max_dim / max(w, h), 1.0)
-                            if scale < 1.0:
-                                new_size = (int(w * scale), int(h * scale))
-                                cropped = cropped.resize(new_size, Image.LANCZOS)
+                    # Redimensionner si nécessaire pour garder une taille raisonnable (max 1024)
+                    max_dim = 1024
+                    w, h = cropped.size
+                    scale = min(max_dim / max(w, h), 1.0)
+                    if scale < 1.0:
+                        new_size = (int(w * scale), int(h * scale))
+                        cropped = cropped.resize(new_size, Image.LANCZOS)
 
-                            # Si l'utilisateur a fourni du texte à ajouter, on l'ajoute maintenant
-                            if overlay_text:
-                                draw = ImageDraw.Draw(cropped)
-                                # Taille de la police relative à la hauteur de l'image
-                                try:
-                                    font_size = max(16, int(cropped.height * 0.06))
-                                    font = ImageFont.truetype("Arial.ttf", font_size)
-                                except Exception:
-                                    font = ImageFont.load_default()
+                    # Si l'utilisateur a fourni du texte à ajouter, on l'ajoute maintenant
+                    if overlay_text:
+                        draw = ImageDraw.Draw(cropped)
+                        # Taille de la police relative à la hauteur de l'image
+                        try:
+                            font_size = max(16, int(cropped.height * 0.06))
+                            font = ImageFont.truetype("Arial.ttf", font_size)
+                        except Exception:
+                            font = ImageFont.load_default()
 
-                                # Calculer position (bas à gauche avec marge relative)
-                                margin_x = int(cropped.width * 0.03)
-                                margin_y = int(cropped.height * 0.03)
-                                text_w, text_h = draw.textsize(overlay_text, font=font)
-                                position = (margin_x, cropped.height - text_h - margin_y)
+                        # Calculer position (bas à gauche avec marge relative)
+                        margin_x = int(cropped.width * 0.03)
+                        margin_y = int(cropped.height * 0.03)
+                        text_w, text_h = draw.textsize(overlay_text, font=font)
+                        position = (margin_x, cropped.height - text_h - margin_y)
 
-                                # Ombre + texte pour lisibilité
-                                draw.text((position[0] + 2, position[1] + 2), overlay_text, font=font, fill="black")
-                                draw.text(position, overlay_text, font=font, fill="white")
+                        # Ombre + texte pour lisibilité
+                        draw.text((position[0] + 2, position[1] + 2), overlay_text, font=font, fill="black")
+                        draw.text(position, overlay_text, font=font, fill="white")
 
-                            # Sauvegarde l'image modifiée dans un buffer mémoire
-                            buf = io.BytesIO()
-                            cropped.save(buf, format="PNG")
-                            display_image_data = buf.getvalue()
+                    # Sauvegarde l'image modifiée dans un buffer mémoire
+                    buf = io.BytesIO()
+                    cropped.save(buf, format="PNG")
+                    display_image_data = buf.getvalue()
 
-                            st.image(display_image_data, caption=f"Image générée ({ratio_choice}) pour : '{image_prompt}'")
-                            filename = f"generated_image_{ratio_choice.replace(':','-')}.png"
-                            st.download_button(label="📥 Télécharger l'image", data=display_image_data, file_name=filename, mime="image/png")
-                            # Nettoyage optionnel: laisser temporaire pour debug, sinon supprimer
-                            pass
-
+                    st.image(display_image_data, caption=f"Image générée ({ratio_choice}) pour : '{image_prompt}'")
+                    filename = f"generated_image_{ratio_choice.replace(':','-')}.png"
+                    st.download_button(label="📥 Télécharger l'image", data=display_image_data, file_name=filename, mime="image/png")
                 except requests.exceptions.RequestException as e:
                     st.error(f"Erreur lors de la récupération de l'image : {e}")
                 except Exception as e:
