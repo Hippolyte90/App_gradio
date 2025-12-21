@@ -11,3 +11,5 @@ plotly
 google-generativeai
 requests
 Pillow
+moviepy
+pydub

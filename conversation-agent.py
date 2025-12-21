@@ -6,6 +6,9 @@ import os
 import streamlit as st
 import requests
 import io
+import tempfile
+import subprocess
+import zipfile
 from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
@@ -142,7 +145,7 @@ def crop_to_aspect(img: Image.Image, target_ratio: float) -> Image.Image:
 st.title("🤖 Agent IA Multi-Tâches")
 st.markdown("Discutez avec des modèles de langage ou générez des images.")
 
-task_choice = st.selectbox("Quelle tâche souhaitez-vous effectuer ?", ["💬 Chat", "🎨 Génération d'images"])
+task_choice = st.selectbox("Quelle tâche souhaitez-vous effectuer ?", ["💬 Chat", "🎨 Génération d'images", "🎬 Génération de vidéos"])
 
 if task_choice == "💬 Chat":
     st.header("💬 Chat Multi-Modèles (GPT | Gemini | Groq)")
@@ -178,7 +181,7 @@ if task_choice == "💬 Chat":
             full_response += chunk
             response_placeholder.markdown(full_response)
 
-        st.session_state.chat_history.append(("assistant", full_response))
+        elif task_choice == "🎨 Génération d'images":
 
 elif task_choice == "🎨 Génération d'images":
     st.header("🎨 Génération d'images avec DALL-E 3")
@@ -191,61 +194,61 @@ elif task_choice == "🎨 Génération d'images":
         with st.spinner("Génération de l'image en cours..."):
             image_url = generate_image_dalle(image_prompt)
             if image_url and "Erreur" not in image_url:
-                display_image_data = None
-                try:
-                    # Récupérer le contenu de l'image depuis l'URL
-                    image_data = requests.get(image_url).content
+                            # Récupérer le contenu de l'image depuis l'URL
+                            image_data = requests.get(image_url).content
 
-                    # Ouvre l'image avec Pillow et force RGBA pour conserver canaux
-                    img = Image.open(io.BytesIO(image_data)).convert("RGBA")
+                            # Ouvre l'image avec Pillow et force RGBA pour conserver canaux
+                            img = Image.open(io.BytesIO(image_data)).convert("RGBA")
 
-                    # Déterminer le ratio cible
-                    if ratio_choice == "1:1":
-                        target_ratio = 1.0
-                    elif ratio_choice == "16:9":
-                        target_ratio = 16.0 / 9.0
-                    else:
-                        target_ratio = 9.0 / 16.0
+                            # Déterminer le ratio cible
+                            if ratio_choice == "1:1":
+                                target_ratio = 1.0
+                            elif ratio_choice == "16:9":
+                                target_ratio = 16.0 / 9.0
+                            else:
+                                target_ratio = 9.0 / 16.0
 
-                    # Recadrer au ratio choisi (centré)
-                    cropped = crop_to_aspect(img, target_ratio)
+                            # Recadrer au ratio choisi (centré)
+                            cropped = crop_to_aspect(img, target_ratio)
 
-                    # Redimensionner si nécessaire pour garder une taille raisonnable (max 1024)
-                    max_dim = 1024
-                    w, h = cropped.size
-                    scale = min(max_dim / max(w, h), 1.0)
-                    if scale < 1.0:
-                        new_size = (int(w * scale), int(h * scale))
-                        cropped = cropped.resize(new_size, Image.LANCZOS)
+                            # Redimensionner si nécessaire pour garder une taille raisonnable (max 1024)
+                            max_dim = 1024
+                            w, h = cropped.size
+                            scale = min(max_dim / max(w, h), 1.0)
+                            if scale < 1.0:
+                                new_size = (int(w * scale), int(h * scale))
+                                cropped = cropped.resize(new_size, Image.LANCZOS)
 
-                    # Si l'utilisateur a fourni du texte à ajouter, on l'ajoute maintenant
-                    if overlay_text:
-                        draw = ImageDraw.Draw(cropped)
-                        # Taille de la police relative à la hauteur de l'image
-                        try:
-                            font_size = max(16, int(cropped.height * 0.06))
-                            font = ImageFont.truetype("Arial.ttf", font_size)
-                        except Exception:
-                            font = ImageFont.load_default()
+                            # Si l'utilisateur a fourni du texte à ajouter, on l'ajoute maintenant
+                            if overlay_text:
+                                draw = ImageDraw.Draw(cropped)
+                                # Taille de la police relative à la hauteur de l'image
+                                try:
+                                    font_size = max(16, int(cropped.height * 0.06))
+                                    font = ImageFont.truetype("Arial.ttf", font_size)
+                                except Exception:
+                                    font = ImageFont.load_default()
 
-                        # Calculer position (bas à gauche avec marge relative)
-                        margin_x = int(cropped.width * 0.03)
-                        margin_y = int(cropped.height * 0.03)
-                        text_w, text_h = draw.textsize(overlay_text, font=font)
-                        position = (margin_x, cropped.height - text_h - margin_y)
+                                # Calculer position (bas à gauche avec marge relative)
+                                margin_x = int(cropped.width * 0.03)
+                                margin_y = int(cropped.height * 0.03)
+                                text_w, text_h = draw.textsize(overlay_text, font=font)
+                                position = (margin_x, cropped.height - text_h - margin_y)
 
-                        # Ombre + texte pour lisibilité
-                        draw.text((position[0] + 2, position[1] + 2), overlay_text, font=font, fill="black")
-                        draw.text(position, overlay_text, font=font, fill="white")
+                                # Ombre + texte pour lisibilité
+                                draw.text((position[0] + 2, position[1] + 2), overlay_text, font=font, fill="black")
+                                draw.text(position, overlay_text, font=font, fill="white")
 
-                    # Sauvegarde l'image modifiée dans un buffer mémoire
-                    buf = io.BytesIO()
-                    cropped.save(buf, format="PNG")
-                    display_image_data = buf.getvalue()
+                            # Sauvegarde l'image modifiée dans un buffer mémoire
+                            buf = io.BytesIO()
+                            cropped.save(buf, format="PNG")
+                            display_image_data = buf.getvalue()
 
-                    st.image(display_image_data, caption=f"Image générée ({ratio_choice}) pour : '{image_prompt}'")
-                    filename = f"generated_image_{ratio_choice.replace(':','-')}.png"
-                    st.download_button(label="📥 Télécharger l'image", data=display_image_data, file_name=filename, mime="image/png")
+                            st.image(display_image_data, caption=f"Image générée ({ratio_choice}) pour : '{image_prompt}'")
+                            filename = f"generated_image_{ratio_choice.replace(':','-')}.png"
+                            st.download_button(label="📥 Télécharger l'image", data=display_image_data, file_name=filename, mime="image/png")
+                            # Nettoyage optionnel: laisser temporaire pour debug, sinon supprimer
+                            pass
 
                 except requests.exceptions.RequestException as e:
                     st.error(f"Erreur lors de la récupération de l'image : {e}")
@@ -253,6 +256,96 @@ elif task_choice == "🎨 Génération d'images":
                     st.error(f"Une erreur est survenue lors du traitement de l'image : {e}")
             else:
                 st.error(image_url)
+
+elif task_choice == "🎬 Génération de vidéos":
+    st.header("🎬 Génération de vidéos (frames → MP4)")
+    video_prompt = st.text_area("🖼️ 1. Décrivez la scène ou le prompt de base :", height=100)
+    overlay_text_vid = st.text_input("✍️ 2. (Optionnel) Texte à ajouter sur chaque frame :")
+    ratio_choice_vid = st.selectbox("🖼️ 3. Choisir le format :", ["16:9", "1:1", "9:16"])
+    frames_count = st.number_input("Nombre de frames", min_value=2, max_value=60, value=8)
+    fps = st.number_input("Images par seconde (fps)", min_value=1, max_value=60, value=12)
+    generate_video_button = st.button("Générer la vidéo")
+
+    if generate_video_button and video_prompt.strip():
+        with st.spinner("Génération des frames en cours..."):
+            try:
+                frames = []
+                tmpdir = tempfile.mkdtemp()
+                for i in range(int(frames_count)):
+                    frame_prompt = f"{video_prompt} (frame {i+1}/{int(frames_count)})"
+                    frame_url = generate_image_dalle(frame_prompt)
+                    if not frame_url or "Erreur" in frame_url:
+                        raise RuntimeError(f"Erreur lors de la génération de la frame {i+1}: {frame_url}")
+                    frame_data = requests.get(frame_url).content
+                    img = Image.open(io.BytesIO(frame_data)).convert("RGBA")
+
+                    # Déterminer le ratio cible
+                    if ratio_choice_vid == "1:1":
+                        target_ratio = 1.0
+                    elif ratio_choice_vid == "16:9":
+                        target_ratio = 16.0 / 9.0
+                    else:
+                        target_ratio = 9.0 / 16.0
+
+                    cropped = crop_to_aspect(img, target_ratio)
+                    max_dim = 1024
+                    w, h = cropped.size
+                    scale = min(max_dim / max(w, h), 1.0)
+                    if scale < 1.0:
+                        new_size = (int(w * scale), int(h * scale))
+                        cropped = cropped.resize(new_size, Image.LANCZOS)
+
+                    if overlay_text_vid:
+                        draw = ImageDraw.Draw(cropped)
+                        try:
+                            font_size = max(12, int(cropped.height * 0.05))
+                            font = ImageFont.truetype("Arial.ttf", font_size)
+                        except Exception:
+                            font = ImageFont.load_default()
+                        margin_x = int(cropped.width * 0.03)
+                        margin_y = int(cropped.height * 0.03)
+                        text = overlay_text_vid + f" ({i+1})"
+                        text_w, text_h = draw.textsize(text, font=font)
+                        position = (margin_x, cropped.height - text_h - margin_y)
+                        draw.text((position[0] + 2, position[1] + 2), text, font=font, fill="black")
+                        draw.text(position, text, font=font, fill="white")
+
+                    frame_path = os.path.join(tmpdir, f"frame_{i:04d}.png")
+                    cropped.save(frame_path, format="PNG")
+                    frames.append(frame_path)
+
+                # Attempter d'assembler avec ffmpeg
+                out_mp4 = os.path.join(tmpdir, "out.mp4")
+                try:
+                    cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-framerate",
+                        str(int(fps)),
+                        "-i",
+                        os.path.join(tmpdir, "frame_%04d.png"),
+                        "-c:v",
+                        "libx264",
+                        "-pix_fmt",
+                        "yuv420p",
+                        out_mp4,
+                    ]
+                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    with open(out_mp4, "rb") as f:
+                        video_bytes = f.read()
+                    st.video(video_bytes)
+                    st.download_button(label="📥 Télécharger la vidéo", data=video_bytes, file_name="generated_video.mp4", mime="video/mp4")
+                except Exception:
+                    # Fallback: ZIP des frames
+                    zip_buf = io.BytesIO()
+                    with zipfile.ZipFile(zip_buf, "w") as zf:
+                        for p in frames:
+                            zf.write(p, arcname=os.path.basename(p))
+                    zip_buf.seek(0)
+                    st.warning("ffmpeg non disponible ou assemblage échoué — fourniture d'un ZIP des frames.")
+                    st.download_button(label="📥 Télécharger les frames (ZIP)", data=zip_buf.getvalue(), file_name="frames.zip", mime="application/zip")
+            except Exception as e:
+                st.error(f"Erreur lors de la génération vidéo : {e}")
 
 # Bouton pour effacer la conversation
 if st.sidebar.button("🧹 Effacer la conversation"):
