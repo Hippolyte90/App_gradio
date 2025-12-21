@@ -13,7 +13,12 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
 from PIL import Image, ImageDraw, ImageFont
-from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images, animate_uploaded_images
+try:
+    from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images, animate_uploaded_images
+except Exception:
+    import sys
+    sys.path.append(os.path.dirname(__file__))
+    from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images, animate_uploaded_images
 
 # -------------------------------
 # 🔧 Configuration de l'application
