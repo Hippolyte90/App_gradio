@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import google.generativeai
 from PIL import Image, ImageDraw, ImageFont
+from video_utils import pil_images_from_uploaded_files, make_mp4_from_pil_images
 
 # -------------------------------
 # 🔧 Configuration de l'application
@@ -259,89 +260,98 @@ elif task_choice == "🎨 Génération d'images":
 elif task_choice == "🎬 Génération de vidéos":
     st.header("🎬 Génération de vidéos (frames → MP4)")
     video_prompt = st.text_area("🖼️ 1. Décrivez la scène ou le prompt de base :", height=100)
-    overlay_text_vid = st.text_input("✍️ 2. (Optionnel) Texte à ajouter sur chaque frame :")
-    ratio_choice_vid = st.selectbox("🖼️ 3. Choisir le format :", ["16:9", "1:1", "9:16"])
-    frames_count = st.number_input("Nombre de frames", min_value=2, max_value=60, value=8)
+    uploaded_images = st.file_uploader("📁 2. (Option) Importer des images depuis votre ordinateur :", accept_multiple_files=True, type=["png", "jpg", "jpeg", "webp"])
+    overlay_text_vid = st.text_input("✍️ 3. (Optionnel) Texte à ajouter sur chaque frame :")
+    ratio_choice_vid = st.selectbox("🖼️ 4. Choisir le format :", ["16:9", "1:1", "9:16"])
+    duration_value = st.number_input("Durée (valeur)", min_value=1, value=5)
+    duration_unit = st.selectbox("Unité", ["secondes", "minutes"]) 
     fps = st.number_input("Images par seconde (fps)", min_value=1, max_value=60, value=12)
     generate_video_button = st.button("Générer la vidéo")
 
-    if generate_video_button and video_prompt.strip():
+    if generate_video_button and (video_prompt.strip() or uploaded_images):
         with st.spinner("Génération des frames en cours..."):
             try:
-                frames = []
-                tmpdir = tempfile.mkdtemp()
-                for i in range(int(frames_count)):
-                    frame_prompt = f"{video_prompt} (frame {i+1}/{int(frames_count)})"
-                    frame_url = generate_image_dalle(frame_prompt)
-                    if not frame_url or "Erreur" in frame_url:
-                        raise RuntimeError(f"Erreur lors de la génération de la frame {i+1}: {frame_url}")
-                    frame_data = requests.get(frame_url).content
-                    img = Image.open(io.BytesIO(frame_data)).convert("RGBA")
+                duration_seconds = int(duration_value) * (60 if duration_unit == "minutes" else 1)
+                total_frames = max(1, int(duration_seconds * int(fps)))
 
-                    # Déterminer le ratio cible
-                    if ratio_choice_vid == "1:1":
-                        target_ratio = 1.0
-                    elif ratio_choice_vid == "16:9":
-                        target_ratio = 16.0 / 9.0
-                    else:
-                        target_ratio = 9.0 / 16.0
+                pil_images = []
+                # Si l'utilisateur a uploadé des images, on les utilise
+                if uploaded_images:
+                    pil_images = pil_images_from_uploaded_files(uploaded_images)
+                else:
+                    # Générer frames via DALL·E selon le prompt
+                    for i in range(total_frames):
+                        frame_prompt = f"{video_prompt} (frame {i+1}/{total_frames})"
+                        frame_url = generate_image_dalle(frame_prompt)
+                        if not frame_url or "Erreur" in frame_url:
+                            raise RuntimeError(f"Erreur lors de la génération de la frame {i+1}: {frame_url}")
+                        frame_data = requests.get(frame_url).content
+                        img = Image.open(io.BytesIO(frame_data)).convert("RGBA")
 
-                    cropped = crop_to_aspect(img, target_ratio)
-                    max_dim = 1024
-                    w, h = cropped.size
-                    scale = min(max_dim / max(w, h), 1.0)
-                    if scale < 1.0:
-                        new_size = (int(w * scale), int(h * scale))
-                        cropped = cropped.resize(new_size, Image.LANCZOS)
+                        # Appliquer ratio et redimensionnement
+                        if ratio_choice_vid == "1:1":
+                            target_ratio = 1.0
+                        elif ratio_choice_vid == "16:9":
+                            target_ratio = 16.0 / 9.0
+                        else:
+                            target_ratio = 9.0 / 16.0
+                        cropped = crop_to_aspect(img, target_ratio)
+                        max_dim = 1024
+                        w, h = cropped.size
+                        scale = min(max_dim / max(w, h), 1.0)
+                        if scale < 1.0:
+                            new_size = (int(w * scale), int(h * scale))
+                            cropped = cropped.resize(new_size, Image.LANCZOS)
+                        pil_images.append(cropped)
 
-                    if overlay_text_vid:
-                        draw = ImageDraw.Draw(cropped)
+                # Si on a des images uploadées, on doit distribuer les frames selon la durée
+                if uploaded_images and pil_images:
+                    n_imgs = len(pil_images)
+                    repeats = -(-total_frames // n_imgs)  # ceil
+                    frames_list = []
+                    for img in pil_images:
+                        for _ in range(repeats):
+                            frames_list.append(img)
+                    frames_list = frames_list[:total_frames]
+                else:
+                    frames_list = pil_images
+
+                # Optionnel: ajouter overlay text (numéro de frame si plusieurs)
+                if overlay_text_vid:
+                    new_frames = []
+                    for idx, img in enumerate(frames_list):
+                        draw = ImageDraw.Draw(img)
                         try:
-                            font_size = max(12, int(cropped.height * 0.05))
+                            font_size = max(12, int(img.height * 0.05))
                             font = ImageFont.truetype("Arial.ttf", font_size)
                         except Exception:
                             font = ImageFont.load_default()
-                        margin_x = int(cropped.width * 0.03)
-                        margin_y = int(cropped.height * 0.03)
-                        text = overlay_text_vid + f" ({i+1})"
+                        margin_x = int(img.width * 0.03)
+                        margin_y = int(img.height * 0.03)
+                        text = overlay_text_vid + (f" ({idx+1})" if len(frames_list) > 1 else "")
                         text_w, text_h = draw.textsize(text, font=font)
-                        position = (margin_x, cropped.height - text_h - margin_y)
+                        position = (margin_x, img.height - text_h - margin_y)
                         draw.text((position[0] + 2, position[1] + 2), text, font=font, fill="black")
                         draw.text(position, text, font=font, fill="white")
+                        new_frames.append(img)
+                    frames_list = new_frames
 
-                    frame_path = os.path.join(tmpdir, f"frame_{i:04d}.png")
-                    cropped.save(frame_path, format="PNG")
-                    frames.append(frame_path)
-
-                # Attempter d'assembler avec ffmpeg
-                out_mp4 = os.path.join(tmpdir, "out.mp4")
+                # Créer la vidéo via imageio (utilise imageio[ffmpeg])
                 try:
-                    cmd = [
-                        "ffmpeg",
-                        "-y",
-                        "-framerate",
-                        str(int(fps)),
-                        "-i",
-                        os.path.join(tmpdir, "frame_%04d.png"),
-                        "-c:v",
-                        "libx264",
-                        "-pix_fmt",
-                        "yuv420p",
-                        out_mp4,
-                    ]
-                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    with open(out_mp4, "rb") as f:
-                        video_bytes = f.read()
+                    video_bytes = make_mp4_from_pil_images(frames_list, fps=int(fps))
                     st.video(video_bytes)
                     st.download_button(label="📥 Télécharger la vidéo", data=video_bytes, file_name="generated_video.mp4", mime="video/mp4")
-                except Exception:
-                    # Fallback: ZIP des frames
+                except Exception as e:
+                    # Fallback: fournir un ZIP des frames
                     zip_buf = io.BytesIO()
                     with zipfile.ZipFile(zip_buf, "w") as zf:
-                        for p in frames:
-                            zf.write(p, arcname=os.path.basename(p))
+                        for i, img in enumerate(frames_list):
+                            b = io.BytesIO()
+                            img.save(b, format="PNG")
+                            b.seek(0)
+                            zf.writestr(f"frame_{i:04d}.png", b.read())
                     zip_buf.seek(0)
-                    st.warning("ffmpeg non disponible ou assemblage échoué — fourniture d'un ZIP des frames.")
+                    st.warning("Assemblée MP4 échouée — fourniture d'un ZIP des frames.")
                     st.download_button(label="📥 Télécharger les frames (ZIP)", data=zip_buf.getvalue(), file_name="frames.zip", mime="application/zip")
             except Exception as e:
                 st.error(f"Erreur lors de la génération vidéo : {e}")

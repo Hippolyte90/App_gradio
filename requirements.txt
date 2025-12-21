@@ -11,6 +11,6 @@ plotly
 google-generativeai
 requests
 Pillow
+imageio[ffmpeg]
 moviepy
 pydub
-imageio
