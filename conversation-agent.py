@@ -334,7 +334,17 @@ elif task_choice == "🎬 Génération de vidéos":
                 # Si on a des images uploadées, on doit distribuer les frames selon la durée
                 if uploaded_images and pil_images:
                     # Créer des frames animées à partir des images uploadées
-                    frames_list = animate_uploaded_images(pil_images, total_frames)
+                    try:
+                        frames_list = animate_uploaded_images(pil_images, total_frames)
+                    except Exception:
+                        # Fallback simple : répartir/dupliquer les images pour remplir total_frames
+                        n_imgs = len(pil_images)
+                        frames_list = []
+                        repeats = -(-total_frames // n_imgs)  # ceil
+                        for img in pil_images:
+                            for _ in range(repeats):
+                                frames_list.append(img)
+                        frames_list = frames_list[:total_frames]
                 else:
                     frames_list = pil_images
 
