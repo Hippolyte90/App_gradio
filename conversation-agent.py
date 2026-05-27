@@ -14,6 +14,7 @@ from openai import OpenAI
 import google.generativeai
 from PIL import Image, ImageDraw, ImageFont
 import importlib
+import base64
 video_utils = None
 pil_images_from_uploaded_files = None
 make_mp4_from_pil_images = None
@@ -135,18 +136,21 @@ def stream_groq(prompt):
 
 def generate_image_dalle(prompt):
     try:
-        response = openai.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
-        image_url = response.data[0].url
-        return image_url
-    except Exception as e:
-        return f"Erreur lors de la génération de l'image : {e}"
+        # Generate the image using the new model
+        result = openai.images.generate(model="gpt-image-2", prompt=prompt)
 
+        # Extract and decode the base64 data
+        image_base64 = result.data[0].b64_json
+        image_bytes = base64.b64decode(image_base64)
+
+        # Save the image to the specific file
+        with open("otter.png", "wb") as f:
+            f.write(image_bytes)
+
+        # Return the local path or success message as a string
+        return "otter.png"
+    except Exception as e:
+        return f"Error during image generation: {e}"
 
 def crop_to_aspect(img: Image.Image, target_ratio: float) -> Image.Image:
     """Recadre l'image au centre pour respecter le ratio cible (width/height)."""
