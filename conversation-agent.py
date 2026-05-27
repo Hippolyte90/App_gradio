@@ -229,8 +229,9 @@ elif task_choice == "🎨 Génération d'images":
                 display_image_data = None
                 try:
                     # Récupérer le contenu de l'image depuis l'URL
-                    image_data = requests.get(image_url).content
-
+                    # Lire le fichier image local retourné par generate_image_dalle
+                    with open(image_url, "rb") as f:
+                        image_data = f.read()
                     # Ouvre l'image avec Pillow et force RGBA pour conserver canaux
                     img = Image.open(io.BytesIO(image_data)).convert("RGBA")
 
